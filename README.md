@@ -1,5 +1,5 @@
 # Gobbed
-![Gobbed logo](ic_launcher-hdpi.png) Gobbed is Free Software for connecting to your vehicle's data buses.
+![Gobbed logo](icon/ic_launcher-hdpi.png) Gobbed is Free Software for connecting to your vehicle's data buses.
 
 ## Design
 
