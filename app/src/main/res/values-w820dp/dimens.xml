@@ -1,0 +1,4 @@
+<!-- Copyright (C) David Hubbard 2016. Licensed under the GPLv3. -->
+<resources>
+    <dimen name="activity_horizontal_margin">0dp</dimen>
+</resources>
