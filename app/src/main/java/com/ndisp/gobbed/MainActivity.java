@@ -1,3 +1,5 @@
+/* Copyright (C) David Hubbard 2016. Licensed under the GPLv3. */
+
 package com.ndisp.gobbed;
 
 import android.annotation.SuppressLint;

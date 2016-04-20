@@ -1,5 +1,5 @@
 # Gobbed
-![Gobbed logo](icon/ic_launcher-hdpi.png) Gobbed is Free Software for connecting to your vehicle's data buses.
+![Gobbed logo](icon/ic_launcher-hdpi.png) Gobbed is [Free Software](COPYING.md) for connecting to your vehicle's data buses.
 
 ## Design
 
@@ -21,3 +21,7 @@ I write using Android Studio. It won't be too hard to test building the project 
 2. Open the project in Android Studio and choose Run menu > Run 'app'
 3. If it runs ok on your device then you are ready to hack on the code.
 4. Go to (TBD source dir) and take a look at (TBD source file). This sets up the main UI.
+
+## Copyright
+
+Gobbed Copyright (c) David Hubbard 2016. Licensed under the [GPLv3](COPYING.md). Please see the [COPYING.md](COPYING.md) file in this directory.
