@@ -1,0 +1,21 @@
+{
+  "manifest_version": 2,
+  "name": "Gobbed",
+  "description": "http://github.com/davidhubbard/gobbed",
+  "version": "0.1",
+  "app": {
+    "background": {
+      "scripts": ["background.js"]
+    }
+  },
+  "permissions": [
+    "serial",
+    "storage"
+  ],
+  "bluetooth": {
+    // See https://developer.chrome.com/apps/manifest/bluetooth
+    "uuids": [ "1101" ],  // expands to 00001101-0000-1000-8000-00805F9B34FB
+    "socket": true
+  },
+  "icons": { "16": "gobbed-72.png", "128": "gobbed-144.png" }
+}

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+<!-- Copyright (C) David Hubbard 2016. Licensed under the GPLv3. -->
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Gobbed App</title>
+<script src="util.js"></script>
+<script src="elm327.js"></script>
+<script src="device.js"></script>
+<style type="text/css">
+html, body {
+    /*overflow-y: auto;*/
+    height: 100%;
+}
+body.gobbed {
+    margin: 0px;
+    zoom: 2;
+}
+.gobbed-table {
+    display:table;
+    table-layout:fixed;
+    width:100%;
+}
+.trow {
+    display:table-row;
+}
+.height100 {
+    height:100%;
+}
+.trow-cell {
+    display:table-cell;
+    height:100%;
+}
+.ttab {
+    display:inline-block;
+    float:left;
+    padding-left:5px;
+    padding-right:5px;
+}
+.ttab-right {
+    float:right;
+}
+.ttab-disabled {
+    background: #ffffff !important;
+    color: #000000 !important;
+}
+.bg-main {
+    background: #000000;
+    color: #ffffff;
+}
+.bg-term {
+    background: #f0f0ff;
+}
+.bg-settings {
+    background: #f0f0f0;
+}
+.btab {
+    width:100%;
+    height:100%;
+}
+.device-list {
+    background: #f0f0f0;
+    overflow-y: scroll;
+}
+.device-list-action {
+    display:inline-block;
+    float:right;
+}
+.device-list-class {
+    font-weight: bold;
+}
+.device-list-item {
+    padding-left: 20px;
+}
+.device-list-item:hover {
+    background: #ffffe0;
+}
+.device-list-item-selected {
+    padding-left: 20px;
+    background: #f0f060;
+}
+.device-list-item-disabled {
+    padding-left: 20px;
+}
+.bluetooth-scan-action {
+    color: #2090f0;
+    text-decoration: underline;
+}
+.bluetooth-addr {
+    display:none;
+}
+.tab-main {
+    overflow-y: scroll;
+    color: #ffffff;
+}
+.tab-term {
+    overflow-y: scroll;
+    background: #f0f0ff;
+}
+.term-chat {
+    margin:0;
+}
+.proto-panel {
+    float:right;
+    font-size:6pt;
+    display:inline-block;
+    text-align:right;
+}
+.main-connect:hover {
+    background: #ffffe0;
+    color: #000000;
+}
+.221430 {
+    color: #c0ff60;
+}
+</style>
+</head>
+<body class="gobbed">
+<div class="gobbed-table height100">
+<div class="trow">
+    <div class="ttab bg-main">Gobbed</div>
+    <div class="ttab bg-term">Terminal</div>
+    <div class="ttab ttab-right bg-settings">Settings</div>
+</div>
+
+<div class="trow height100"><div class="trow-cell height100">
+    <div class="btab tab-main bg-main height100">
+        <div class="proto-panel">
+            <div class="main-connect"></div>
+            <div class="main-volts"></div>
+        </div>
+        VGT:
+        <div class="22096d"></div>
+        Glow plug:
+        <div class="221430"></div>
+    </div>
+    <div class="btab tab-term" style="display:none;">
+        <pre class="term-chat height100"></pre>
+    </div>
+    <div class="btab tab-settings device-list" style="display:none;"></div>
+</div></div>
+
+<!--<div class="trow">footer</div>-->
+</div></body></html>
