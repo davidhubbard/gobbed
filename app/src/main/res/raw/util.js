@@ -90,11 +90,12 @@ function WrapWebviewBluetoothSocket() {
 }
 
 WrapWebviewBluetoothSocket.prototype.send = function(sockId, ab, cb) {
+  var str = String.fromCharCode.apply(null, new Uint8Array(ab.data));
   var j = webview_bluetoothsocket.send(sockId, str);
   console.log('webview_bluetoothsocket.send():');
   console.log(j);
   var r = JSON.parse(j);
-  window.wrapWebviewRuntime.lastError = r.lastError;
+  window.chromeApiWrapped.runtime.lastError = r.lastError;
   setTimeout(cb.bind(window, r.count), 0);
 }
 
@@ -119,17 +120,37 @@ function WrapWebviewBluetooth() {
 }
 
 WrapWebviewBluetooth.prototype.getDevices = function(cb) {
-  var r = webview_bluetooth.getDevices();
-  console.log('webview_bluetooth.getDevices():');
-  console.log(r);
-  setTimeout(cb.bind(window, JSON.parse(r)), 0);
+  setTimeout(cb.bind(window, JSON.parse(webview_bluetooth.getDevices())), 0);
 }
 
 WrapWebviewBluetooth.prototype.getAdapterState = function(cb) {
-  var r = webview_bluetooth.getAdapterState();
-  console.log('webview_bluetooth.getAdapterState():');
-  console.log(r);
-  setTimeout(cb.bind(window, JSON.parse(r)), 0);
+  setTimeout(cb.bind(window, JSON.parse(webview_bluetooth.getAdapterState())), 0);
+}
+
+WrapWebviewBluetooth.prototype.startDiscovery = function(cb) {
+  var r = JSON.parse(webview_bluetooth.startDiscovery());
+  window.chromeApiWrapped.runtime.lastError = r.lastError;
+  setTimeout(cb.bind(window), 0);
+}
+
+WrapWebviewBluetooth.prototype.fireCbs = function(cbName, devIndex) {
+  if (typeof(this[cbName]) == 'undefined') {
+    console.log("fireCbs(" + cbName + "): not found");
+    return;
+  }
+  cbArgs = []
+  if (typeof(devIndex) != 'undefined') {
+    devs = JSON.parse(webview_bluetooth.getDevices());
+    if (devIndex >= 0 && devs.length > devIndex) {
+      cbArgs.push(devs[devIndex]);
+    } else {
+      console.log("fireCbs(" + cbName + ", " + devIndex + "): bad devIndex");
+      return;
+    }
+  }
+  for (var i = 0; i < this[cbName].length; i++) {
+    this[cbName][i].apply(window, cbArgs);
+  }
 }
 
 function WrapWebviewSerial() {}
@@ -141,20 +162,14 @@ WrapWebviewSerial.prototype.getDevices = function(cb) {
 
 function WrapWebviewStorage() {
   this.local = {
-    'get': function(k, cb) {
-      var j = webview_storage.get(k);
-      console.log('webview_storage.get():');
-      console.log(j);
-      var r = JSON.parse(j);
-      window.wrapWebviewRuntime.lastError = r.lastError;
+    'get': function(o, cb) {
+      var r = JSON.parse(webview_storage.get(JSON.stringify(o)));
+      window.chromeApiWrapped.runtime.lastError = r.lastError;
       setTimeout(cb.bind(window, r.value), 0);
     },
     'set': function(o, cb) {
-      var j = webview_storage.set(JSON.stringify(o));
-      console.log('webview_storage.set():');
-      console.log(j);
-      var r = JSON.parse(j);
-      window.wrapWebviewRuntime.lastError = r.lastError;
+      var r = JSON.parse(webview_storage.set(JSON.stringify(o)));
+      window.chromeApiWrapped.runtime.lastError = r.lastError;
       setTimeout(cb.bind(window), 0);
     },
   }
@@ -164,19 +179,26 @@ function detectChromeApi() {
   var api = {};
   try {
     api = chrome;
+    return api;
   } catch (e) {
-    if (typeof(webview_serial) != 'undefined' && typeof(webview_bluetooth) != 'undefined') {
-      window.wrapWebviewRuntime = {}
-      return {
-        'bluetooth': new WrapWebviewBluetooth(),
-        'bluetoothSocket': new WrapWebviewBluetoothSocket(),
-        'runtime': window.wrapWebviewRuntime,
-        'serial': new WrapWebviewSerial(),
-        'storage': new WrapWebviewStorage(),
-      }
-    }
-    // Reset api
-    return {};
+    // Fallthrough.
   }
-  return api;
+  // Exception: chrome is undefined.
+  if (typeof(window.chromeApiWrapped) != 'undefined') {
+    // detectChromeApi() was previous called, and the result is already cached.
+    return window.chromeApiWrapped;
+  }
+  // Is this an Android Webview?
+  if (typeof(webview_serial) != 'undefined' && typeof(webview_bluetooth) != 'undefined') {
+    window.chromeApiWrapped = {
+      'bluetooth': new WrapWebviewBluetooth(),
+      'bluetoothSocket': new WrapWebviewBluetoothSocket(),
+      'runtime': {},  // Modified by some of the wrapper classes above.
+      'serial': new WrapWebviewSerial(),
+      'storage': new WrapWebviewStorage(),
+    }
+    return window.chromeApiWrapped;
+  }
+  // No api detected.
+  throw "No hardware api detected."
 }

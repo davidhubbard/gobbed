@@ -2,43 +2,33 @@
 
 package com.ndisp.gobbed;
 
-import android.annotation.SuppressLint;
+import android.Manifest;
+import android.annotation.TargetApi;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Handler;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.v7.app.AlertDialog;
+import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.WebView;
 
 public class MainActivity extends AppCompatActivity {
     public static final String TAG = "MainActivity";
+    public static final int GOBBED_REQUEST_DISCOVERABLE = 65004;
+    private static final int PERMISSION_REQUEST_LOCATION = 1;
+    private static final String PERMISSION_REQUEST_LOCATION_KEY = "PERMISSION_REQUEST_LOCATION";
 
-    protected WebView mWeb;
+    private boolean alreadyAskedForPermission = false;
+
+    protected GobbedWebView mWeb;
     protected Handler mHandler;
-
-    @SuppressLint("SetJavascriptEnabled")
-    protected void initWebViewEnableJS() {
-        mWeb.getSettings().setJavaScriptEnabled(true);
-    }
-
-    @SuppressLint("JavascriptInterface")  // TODO: doesn't appear to do anything.
-    protected void initWebView(String html) {
-        initWebViewEnableJS();
-        // Allow chrome://inspect to connect to all WebView instances in this app.
-        if (Build.VERSION.SDK_INT >= 19) WebView.setWebContentsDebuggingEnabled(true);
-        // Note: exposing Java objects below JELLY_BEAN_MR1 may expose any public fields to
-        // untrusted javascript code via reflection. But this app does not load external js.
-        // To lock it down, add: if (Build.VERSION.SDK_INT >= 17)
-        mWeb.addJavascriptInterface(new WebViewInterfaces.Bluetooth(), "webview_bluetooth");
-        mWeb.addJavascriptInterface(new WebViewInterfaces.BluetoothSocket(),
-                "webview_bluetoothsocket");
-        mWeb.addJavascriptInterface(new WebViewInterfaces.Serial(), "webview_serial");
-        mWeb.addJavascriptInterface(new WebViewInterfaces.Storage(), "webview_storage");
-        mWeb.loadData("", "text/html", null);  // Dummy load: see addJavascriptInterface() docs.
-        mWeb.loadDataWithBaseURL("file:///android_res/raw/", html, "text/html", "UTF-8", "");
-    }
 
     protected String getRawResourceAsString(int resourceId) {
         // openRawResourceFd() only works if the resource file is stored in the apk uncompressed.
@@ -88,12 +78,115 @@ public class MainActivity extends AppCompatActivity {
         getBackInImmersive();
         setContentView(R.layout.activity_main);
 
-        mWeb = (WebView) findViewById(R.id.web_view);
-        initWebView(getRawResourceAsString(R.raw.index));
+        if (savedInstanceState != null) {
+            alreadyAskedForPermission =
+                    savedInstanceState.getBoolean(PERMISSION_REQUEST_LOCATION_KEY, false);
+        }
+        checkPermissions();
+
+        mWeb = (GobbedWebView) findViewById(R.id.web_view);
+        mWeb.initGobbedWebView(this, getRawResourceAsString(R.raw.index));
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(PERMISSION_REQUEST_LOCATION_KEY, alreadyAskedForPermission);
     }
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         // Do nothing.
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        mWeb.onPause();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        mWeb.onResume();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
+        switch (requestCode) {
+            case GOBBED_REQUEST_DISCOVERABLE:
+                mWeb.onBluetoothDiscoveryResult(resultCode != RESULT_CANCELED);
+                break;
+        }
+    }
+
+    private boolean checkPermissions() {
+        if (alreadyAskedForPermission) {
+            // don't check again because the dialog is still open
+            return false;
+        }
+
+        if (Build.VERSION.SDK_INT < 23) {
+            alreadyAskedForPermission = true;
+            return true;
+        }
+
+        // Android M (API 23) new permissions. The redundant if condition silences Android Studio.
+        if (Build.VERSION.SDK_INT >= 23 &&
+                this.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED) {
+            return true;
+        }
+
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("This app needs location access");
+        builder.setMessage(
+                "Please grant location access so this app can detect bluetooth devices.");
+        builder.setPositiveButton(android.R.string.ok, null);
+        builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @TargetApi(23)
+            @Override
+            public void onDismiss(DialogInterface dialog) {
+                // the dialog will be opened so we have to save that
+                alreadyAskedForPermission = true;
+                requestPermissions(new String[]{
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                }, PERMISSION_REQUEST_LOCATION);
+            }
+        });
+        builder.show();
+        return false;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
+        switch (requestCode) {
+            case PERMISSION_REQUEST_LOCATION: {
+                // the request returned a result so the dialog is closed
+                alreadyAskedForPermission = false;
+
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+                    Log.d(TAG, "Coarse and fine location permissions granted");
+                    // Now run the code that needs the permissions.
+                } else {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                        builder.setTitle("Bluetooth scan permission denied");
+                        builder.setMessage("The location access permission is needed to " +
+                                "scan for bluetooth devices. (I guess it could give away " +
+                                "your location?)");
+                        builder.setPositiveButton(android.R.string.ok, null);
+                        builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                            @Override
+                            @TargetApi(23)
+                            public void onDismiss(DialogInterface dialog) {
+                            }
+                        });
+                        builder.show();
+                    }
+                }
+            }
+        }
     }
 }

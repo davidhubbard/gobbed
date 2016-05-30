@@ -215,7 +215,6 @@ function btListDevices() {
         + ' scanning...</div>';
       if (!adapter.available) h = '';
       h += '<div class="device-list-class">bluetooth devices:</div>\n';
-      //  + JSON.stringify(adapter) + '\n';
       var formatBtDev = function(dev) {
         var h = '<div class="device-list-item';
         if (dev.address == window.selectedBtDev) h += '-selected';
@@ -283,7 +282,7 @@ function btHandleDevEvent(note, dev) {
     // connection failed, and this is the only way to detect it.
     btStartConnectionResponse('removed');
   }
-  console.log('btDev ' + note + ' ' + dev.address + ' ' + dev.uuids.length + ' uuids');
+  //console.log('btDev ' + note + ' ' + dev.address + ' ' + dev.uuids.length + ' uuids');
   //console.log(dev);
   listDevices();
 }
@@ -354,7 +353,7 @@ function listDevices() {
       var h = '<div class="device-list-class">serial devices: (not yet working)</div>\n';
       var dev = {};
       if (a.length == 0) {
-        h += 'No serial devices found.';
+        h += 'No serial devices found. (see bug #5)';
       } else for (var i = 0; i < a.length; i++) {
         dev = a[i];
         h += '<div class="device-list-item-disabled">' + dev.path;
