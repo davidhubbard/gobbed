@@ -211,10 +211,10 @@ function btListDevices() {
   api.bluetooth.getAdapterState(function(adapter) {
     var showBtDevs = function (devlist) {
       var results_txt = adapter.discovering ? 'Stop' : 'Start';
-      var h = '<div class="device-list-action bluetooth-scan-action">' + results_txt
-        + ' scanning...</div>';
-      if (!adapter.available) h = '';
-      h += '<div class="device-list-class">bluetooth devices:</div>\n';
+      var h = '<div class="device-list-class">bluetooth devices:</div>\n';
+      if (adapter.available) {
+        h += '<div class="bluetooth-scan-action">' + results_txt + ' scanning...</div>';
+      }
       var formatBtDev = function(dev) {
         var h = '<div class="device-list-item';
         if (dev.address == window.selectedBtDev) h += '-selected';
@@ -369,8 +369,93 @@ function listDevices() {
   } else if (getHTMLofClass('device-list') == '') {
     // Populate <div class="device-list"> only the first time.
     // BUG: This will break if support for a class of devices changes during runtime.
-    setHTMLofClass('device-list', 'Select a device:' + h);
+    setHTMLofClass('device-list', 'Which device links to your car?' +
+        '<div class="system-settings-box"><a href="javascript:systemSettings();">' +
+        '[system]</a></div>' + h);
+    if (api.system && api.storage && typeof(window.askForLocationPermission) == 'undefined') {
+      api.storage.local.get({ 'haveLocationPermission': '' }, function(result) {
+        if (typeof(api.runtime.lastError) != 'undefined') {
+          console.log('chrome.storage.local.get failed:');
+          console.log(api.runtime.lastError);
+          return;
+        }
+        console.log('result.haveLocationPermission=');
+        console.log(result.haveLocationPermission);
+        window.askForLocationPermission = (result.haveLocationPermission == '');
+        if (!window.askForLocationPermission) {
+          return;
+        }
+        // setTabToIndex(2) will re-run listDevices()
+        console.log('about to setTabToIndex(2): window.askForLocationPermission=');
+        console.log(window.askForLocationPermission);
+        setTabToIndex(2);
+      });
+    }
   }
+  if (api.system && api.storage && window.askForLocationPermission) {
+    window.askForLocationPermission = false;
+    setHTMLofClass('device-list', '<br/>\n' +
+        '<b>Android M puts bluetooth scans under "Location" privileges.</b><br/>\n' +
+        '<br/>\n' +
+        'Please grant Location privileges to unlock bluetooth scanning. ' +
+        'Or please use your system bluetooth settings.' +
+        '<br/>\n' +
+        '<br/>\n' +
+        'This app does not use your location. Verify online at <a href=' +
+        '"https://github.com/davidhubbard/gobbed/wiki/Verifiable-Builds" target="_blank"' +
+        '>verifiable builds</a>.<br/>\n' +
+        '<br/>\n' +
+        'This screen is only shown once. Clear Gobbed app data and cache, AND uninstall the app ' +
+        'to see this screen again.<br/>\n' +
+        '<br/>\n' +
+        'Status:<br/>' +
+        '<div class="permission-status"><tt>Initializing permission state.</tt></div>' +
+        '<div style="display:none;">' +
+        '<div class="device-list-bluetooth"></div>' +
+        '<div class="device-list-serial"></div>' +
+        '</div>');
+    api.storage.local.set({ 'haveLocationPermission': 'N' }, function() {
+      if (typeof(api.runtime.lastError) != 'undefined') {
+        console.log('chrome.storage.local.set failed:');
+        console.log(api.runtime.lastError);
+        return;
+      }
+      setHTMLofClass('permission-status', '<tt>Ask user for permission</tt>');
+      api.system.run('request-location-permission');
+    });
+  }
+}
+
+function systemSettings() {
+  var api = detectChromeApi();
+  if (api.system) {
+    api.system.run('bluetooth-settings');
+  } else {
+    console.log('No system settings API support.')
+  }
+}
+
+// WebViewFragment.onRequestPermissionsResult() calls this code.
+function systemLocationPermissionResult(result) {
+  if (result != 'Y' && result != 'N') {
+    console.log('systemLocationPermissionResult(' + result + ') invalid');
+    setHTMLofClass('permission-status', 'systemLocationPermissionResult(' + result + ') invalid');
+    return;
+  }
+  setHTMLofClass('permission-status', 'Permission <tt><font color="red"><b>' +
+      (result == 'Y' ? 'GRANTED' : 'DENIED') + '</font></b></tt>');
+  var api = detectChromeApi();
+  api.storage.local.set({ 'haveLocationPermission': result }, function() {
+    if (typeof(api.runtime.lastError) != 'undefined') {
+      console.log('chrome.storage.local.set failed:');
+      console.log(api.runtime.lastError);
+      return;
+    }
+  });
+  setTimeout(function() {
+    setHTMLofClass('device-list', '');
+    listDevices();
+  }, 500);
 }
 
 var tabChangeHandlers = {
@@ -386,21 +471,25 @@ function setTabTo(e) {
   for (var i = 0; i < elist.length; i++) {
     if (elist[i] == e.target) newTab = i;
   }
-  if (newTab == -1) {
+  setTabToIndex(newTab);
+}
+
+function setTabToIndex(newTab) {
+  var elist = document.getElementsByClassName('ttab');
+  if (newTab < 0 || newTab >= elist.length) {
     console.log('BUG: failed to find new tab, resetting to tab 0');
     newTab = 0;
-    e.target = elist[newTab];
   }
   window.curTab = newTab;
 
   // Hide all tabs
-  elist = document.getElementsByClassName('btab');
-  for (var i = 0; i < elist.length; i++) {
-    elist[i].style.display = 'none';
+  var blist = document.getElementsByClassName('btab');
+  for (var i = 0; i < blist.length; i++) {
+    blist[i].style.display = 'none';
   }
 
   // Show curTab
-  var tabClassName = e.target.className;
+  var tabClassName = elist[newTab].className;
   if (tabClassName.indexOf("bg-") != -1) {
     tabClassName = tabClassName.substr(tabClassName.indexOf("bg-")).split(" ")[0].substr(3);
     elist = document.getElementsByClassName('tab-' + tabClassName);

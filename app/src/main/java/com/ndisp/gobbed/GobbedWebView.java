@@ -4,18 +4,12 @@ package com.ndisp.gobbed;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
-import android.app.Activity;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Build;
-import android.preference.PreferenceManager;
+import android.provider.Settings;
 import android.support.annotation.Nullable;
-import android.support.v4.content.LocalBroadcastManager;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
@@ -26,11 +20,10 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.HashSet;
 import java.util.Iterator;
 
 public class GobbedWebView extends WebView {
-    public Activity parentActivity;
+    public WebViewFragment parentFrag;
     private GobbedBluetooth gobbedBluetooth;
 
     GobbedWebView(Context c) { super(c); }
@@ -55,8 +48,8 @@ public class GobbedWebView extends WebView {
     }
 
     @SuppressLint("JavascriptInterface")  // TODO: suppressing this doesn't appear to do anything.
-    public void initGobbedWebView(Activity parentActivity, String html) {
-        this.parentActivity = parentActivity;
+    public void initGobbedWebView(WebViewFragment parentFrag, String html) {
+        this.parentFrag = parentFrag;
 
         initGobbedWebViewEnableJS();
 
@@ -70,9 +63,9 @@ public class GobbedWebView extends WebView {
         addJavascriptInterface(gobbedBluetooth, "webview_bluetooth");
         addJavascriptInterface(new BluetoothSocket(), "webview_bluetoothsocket");
         addJavascriptInterface(new Serial(), "webview_serial");
-        addJavascriptInterface(new Storage(
-                PreferenceManager.getDefaultSharedPreferences(parentActivity.getApplicationContext())),
+        addJavascriptInterface(new Storage(parentFrag.getDefaultSharedPreferences()),
                 "webview_storage");
+        addJavascriptInterface(new System(), "webview_system");
         loadData("", "text/html", null);  // Dummy load: see addJavascriptInterface() docs.
         loadDataWithBaseURL("file:///android_res/raw/", html, "text/html", "UTF-8", "");
     }
@@ -104,12 +97,13 @@ public class GobbedWebView extends WebView {
     }
 
     public void runJsCallbacks(String className, String cbName, @Nullable Integer devIndex) {
-        className = "window.chromeApiWrapped." + className;
+        className = "setTimeout(function(){detectChromeApi()." + className;
         if (devIndex == null) {
-            runJsIgnoreReturn(className + ".fireCbs(\"" + cbName + "\");");
+            className += ".fireCbs(\"" + cbName + "\");";
         } else {
-            runJsIgnoreReturn(className + ".fireCbs(\"" + cbName + "\"," + devIndex + ");");
+            className += ".fireCbs(\"" + cbName + "\"," + devIndex + ");";
         }
+        runJsIgnoreReturn(className + "},0);");
     }
 
     public static class BluetoothSocket {
@@ -135,6 +129,12 @@ public class GobbedWebView extends WebView {
 
         public Storage(SharedPreferences prefs) {
             this.prefs = prefs;
+            if (Build.VERSION.SDK_INT < 23) {
+                // haveLocationPermission is only relevant for API 23+ (Android M's new permissions)
+                SharedPreferences.Editor editor = prefs.edit();
+                editor.putString("haveLocationPermission", "Y");
+                editor.apply();
+            }
         }
 
         @JavascriptInterface
@@ -210,8 +210,25 @@ public class GobbedWebView extends WebView {
                 editor.putString(key, value);
             }
             editor.apply();
-            // yeah, no JSONObject needed!
+            // yeah, no new JSONObject() needed to return "{}".
             return "{}";
+        }
+    }
+
+    private class System {
+        public static final String TAG = "webview_system";
+
+        @JavascriptInterface
+        public String run(String arg) {
+            Log.w(TAG, "run(" + arg + ")");
+            if (arg.equals("bluetooth-settings") && Build.VERSION.SDK_INT >= 11) {
+                parentFrag.startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+                return "";
+            }
+            if (arg.equals("request-location-permission") && Build.VERSION.SDK_INT >= 23) {
+                parentFrag.requestLocationPermission();
+            }
+            return "";
         }
     }
 }

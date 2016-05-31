@@ -133,6 +133,12 @@ WrapWebviewBluetooth.prototype.startDiscovery = function(cb) {
   setTimeout(cb.bind(window), 0);
 }
 
+WrapWebviewBluetooth.prototype.stopDiscovery = function(cb) {
+  var r = JSON.parse(webview_bluetooth.stopDiscovery());
+  window.chromeApiWrapped.runtime.lastError = r.lastError;
+  setTimeout(cb.bind(window), 0);
+}
+
 WrapWebviewBluetooth.prototype.fireCbs = function(cbName, devIndex) {
   if (typeof(this[cbName]) == 'undefined') {
     console.log("fireCbs(" + cbName + "): not found");
@@ -191,6 +197,8 @@ function detectChromeApi() {
   // Is this an Android Webview?
   if (typeof(webview_serial) != 'undefined' && typeof(webview_bluetooth) != 'undefined') {
     window.chromeApiWrapped = {
+      // Android exposes additional APIs that Chrome does not.
+      'system': webview_system,
       'bluetooth': new WrapWebviewBluetooth(),
       'bluetoothSocket': new WrapWebviewBluetoothSocket(),
       'runtime': {},  // Modified by some of the wrapper classes above.

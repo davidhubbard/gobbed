@@ -2,6 +2,7 @@
 
 package com.ndisp.gobbed;
 
+import android.annotation.TargetApi;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
@@ -17,14 +18,14 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class GobbedBluetooth {
     public static final String TAG = "GobbedBluetooth";
     private static final String ACTION_START_DISCOVERY = "com.ndisp.gobbed.action.START_DISCOVERY";
     private final BluetoothAdapter mAdapter;
     private final GobbedWebView gobbedWebView;
-    private HashMap<String, BluetoothDevice> mDeviceList;
+    private ConcurrentHashMap<String, BluetoothDevice> mDeviceList;
     private boolean fakeDiscoveringOneShot;
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
@@ -63,7 +64,8 @@ public class GobbedBluetooth {
     };
 
     // Called either by BroadcastReceiver or onBluetoothDiscoveryResult() because a broadcast is
-    // not sent when discovering starts. See fakeDiscoveringOneShot.
+    // not sent when discovering starts. See fakeDiscoveringOneShot. Or onPause() because pausing
+    // the view -- while it does not destroy the view -- it does pause discovery.
     private void onActionStateChanged(int state) {
         boolean added = false;
         if (state != -1 && state == BluetoothAdapter.STATE_ON) {
@@ -81,12 +83,13 @@ public class GobbedBluetooth {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         this.gobbedWebView = gobbedWebView;
 
-        mDeviceList = new HashMap<String, BluetoothDevice>();
+        mDeviceList = new ConcurrentHashMap<String, BluetoothDevice>();
         for (BluetoothDevice dev : mAdapter.getBondedDevices()) {
             mDeviceList.put(dev.getAddress(), dev);
         }
     }
 
+    @TargetApi(11)
     protected void startDiscoveryOnMainUIThread() {
         // startDiscoveryOnMainUIThread() will ACTION_REQUEST_DISCOVERABLE, in addition to starting
         // discovery. The Chrome Bluetooth API does not expose the discoverable bit.
@@ -96,8 +99,8 @@ public class GobbedBluetooth {
         } else {
             Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
             discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
-            gobbedWebView.parentActivity.startActivityForResult(discoverableIntent,
-                    MainActivity.GOBBED_REQUEST_DISCOVERABLE);
+            gobbedWebView.parentFrag.startActivityForResult(discoverableIntent,
+                    WebViewFragment.GOBBED_REQUEST_DISCOVERABLE);
             // onBluetoothDiscoveryResult() will call startDiscoveryAndDeviceIsDiscoverable().
         }
     }
@@ -130,24 +133,29 @@ public class GobbedBluetooth {
     }
 
     public void onPause() {
-        cancelBluetoothDiscovery();
-        gobbedWebView.parentActivity.unregisterReceiver(mReceiver);
+        if (mAdapter.isDiscovering()) {
+            cancelBluetoothDiscovery();
+            // Alert js that discovery was stopped.
+            onActionStateChanged(mAdapter.getState());
+        }
+        gobbedWebView.parentFrag.unregisterReceiver(mReceiver);
     }
 
     public void onResume() {
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
-        gobbedWebView.parentActivity.registerReceiver(mReceiver, filter);
-
-        // TODO(david, bug #2): receive ACTION_DEVICE_DISAPPEARED ... what broadcast is it?
+        gobbedWebView.parentFrag.registerReceiver(mReceiver, filter);
 
         filter = new IntentFilter(ACTION_START_DISCOVERY);
-        gobbedWebView.parentActivity.registerReceiver(mReceiver, filter);
+        gobbedWebView.parentFrag.registerReceiver(mReceiver, filter);
 
         filter = new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        gobbedWebView.parentActivity.registerReceiver(mReceiver, filter);
+        gobbedWebView.parentFrag.registerReceiver(mReceiver, filter);
 
         filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
-        gobbedWebView.parentActivity.registerReceiver(mReceiver, filter);
+        gobbedWebView.parentFrag.registerReceiver(mReceiver, filter);
+
+        // Alert js that bluetooth devices have changed.
+        onActionStateChanged(mAdapter.getState());
     }
 
     @JavascriptInterface
@@ -238,7 +246,7 @@ public class GobbedBluetooth {
         // Send a broadcast because the call to runJsCallbacks() must happen on the UI thread.
         Intent intent = new Intent();
         intent.setAction(ACTION_START_DISCOVERY);
-        gobbedWebView.parentActivity.sendBroadcast(intent);
+        gobbedWebView.parentFrag.sendBroadcast(intent);
         // No "lastError" means success.
         return "{}";
     }
