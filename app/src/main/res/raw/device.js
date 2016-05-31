@@ -379,15 +379,13 @@ function listDevices() {
           console.log(api.runtime.lastError);
           return;
         }
-        console.log('result.haveLocationPermission=');
-        console.log(result.haveLocationPermission);
+        // GobbedWebView pre-populates haveLocationPermission on devices below API 23, so this
+        // code only runs on Android, and if the device is API 23+.
         window.askForLocationPermission = (result.haveLocationPermission == '');
         if (!window.askForLocationPermission) {
           return;
         }
         // setTabToIndex(2) will re-run listDevices()
-        console.log('about to setTabToIndex(2): window.askForLocationPermission=');
-        console.log(window.askForLocationPermission);
         setTabToIndex(2);
       });
     }
