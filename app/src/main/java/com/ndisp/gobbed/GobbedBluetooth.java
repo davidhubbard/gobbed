@@ -96,7 +96,7 @@ public class GobbedBluetooth {
         }
         gobbedWebView.runJsCallbacks("bluetooth", "changeCb", null);
         if (added) {
-            // TODO(david): Run the devCb after the changeCb.
+            // TODO(david, bug #9): Run the devCb after the changeCb.
             gobbedWebView.runJsIgnoreReturn("console.log(\"ACTION_STATE_CHANGED + added\");");
         }
     }
