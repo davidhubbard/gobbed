@@ -4,6 +4,7 @@ package com.ndisp.gobbed;
 
 import android.annotation.TargetApi;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -21,12 +22,34 @@ import org.json.JSONObject;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class GobbedBluetooth {
+    protected static class GobbedDevice {
+        public final BluetoothDevice btDev;
+        public boolean isPaired;
+        public boolean isConnected;
+        public boolean isConnecting;
+        public boolean isConnectable;
+
+        public GobbedDevice(BluetoothDevice btDev) {
+            this.btDev = btDev;
+        }
+    }
+
+    private ConcurrentHashMap<String, GobbedDevice> mDeviceList;
     public static final String TAG = "GobbedBluetooth";
     private static final String ACTION_START_DISCOVERY = "com.ndisp.gobbed.action.START_DISCOVERY";
     private final BluetoothAdapter mAdapter;
     private final GobbedWebView gobbedWebView;
-    private ConcurrentHashMap<String, BluetoothDevice> mDeviceList;
     private boolean fakeDiscoveringOneShot;
+
+    protected boolean populatePairedDevices() {
+        boolean added = false;
+        for (BluetoothDevice dev : mAdapter.getBondedDevices()) {
+            GobbedDevice gdev = new GobbedDevice(dev);
+            gdev.isPaired = true;
+            added |= mDeviceList.put(dev.getAddress(), gdev) == null;
+        }
+        return added;
+    }
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         private int findDevIndex(BluetoothDevice dev) {
@@ -50,7 +73,7 @@ public class GobbedBluetooth {
                     Log.w(TAG, "EXTRA_DEVICE returned null BluetoothDevice");
                     return;
                 }
-                boolean isNewDev = mDeviceList.put(dev.getAddress(), dev) == null;
+                boolean isNewDev = mDeviceList.put(dev.getAddress(), new GobbedDevice(dev)) == null;
                 gobbedWebView.runJsCallbacks("bluetooth", isNewDev ? "addCb" : "devCb",
                         findDevIndex(dev));
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
@@ -69,12 +92,11 @@ public class GobbedBluetooth {
     private void onActionStateChanged(int state) {
         boolean added = false;
         if (state != -1 && state == BluetoothAdapter.STATE_ON) {
-            for (BluetoothDevice dev : mAdapter.getBondedDevices()) {
-                added |= mDeviceList.put(dev.getAddress(), dev) == null;
-            }
+            added = populatePairedDevices();
         }
         gobbedWebView.runJsCallbacks("bluetooth", "changeCb", null);
         if (added) {
+            // TODO(david): Run the devCb after the changeCb.
             gobbedWebView.runJsIgnoreReturn("console.log(\"ACTION_STATE_CHANGED + added\");");
         }
     }
@@ -83,10 +105,8 @@ public class GobbedBluetooth {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         this.gobbedWebView = gobbedWebView;
 
-        mDeviceList = new ConcurrentHashMap<String, BluetoothDevice>();
-        for (BluetoothDevice dev : mAdapter.getBondedDevices()) {
-            mDeviceList.put(dev.getAddress(), dev);
-        }
+        mDeviceList = new ConcurrentHashMap<String, GobbedDevice>();
+        populatePairedDevices();
     }
 
     @TargetApi(11)
@@ -160,23 +180,28 @@ public class GobbedBluetooth {
 
     @JavascriptInterface
     public String getDevices() {
-        boolean added = false;
-        for (BluetoothDevice dev : mAdapter.getBondedDevices()) {
-            added |= mDeviceList.put(dev.getAddress(), dev) == null;
-        }
+        boolean added = populatePairedDevices();
         JSONArray devices = new JSONArray();
-        for (BluetoothDevice dev: mDeviceList.values()) {
+        for (GobbedDevice gdev: mDeviceList.values()) {
             JSONObject j = new JSONObject();
             try {
-                String s = dev.getName();
+                String s = gdev.btDev.getName();
                 if (s != null) j.put("name", s);
-                s = dev.getAddress();
+                s = gdev.btDev.getAddress();
                 if (s != null) j.put("address", s);
+                j.put("paired", gdev.isPaired);
+                if (gdev.isPaired) {
+                    j.put("connected", gdev.isConnected);
+                    j.put("connecting", gdev.isConnecting);
+                    j.put("connectable", gdev.isConnectable);
+                }
+                BluetoothClass devclass = gdev.btDev.getBluetoothClass();
+                if (devclass != null) j.put("deviceClass", devclass.getDeviceClass());
                 JSONArray uuids = new JSONArray();
                 // If you have never attempted to pair or connect with dev before, getUuids() will
                 // return null (no uuids in cache).
-                if (Build.VERSION.SDK_INT >= 15 && dev.getUuids() != null) { // API 15: Icecream MR1
-                    for (ParcelUuid uuid : dev.getUuids()) {
+                if (Build.VERSION.SDK_INT >= 15 && gdev.btDev.getUuids() != null) { // API 15: Icecream MR1
+                    for (ParcelUuid uuid : gdev.btDev.getUuids()) {
                         uuids.put(uuid.toString());
                     }
                 }

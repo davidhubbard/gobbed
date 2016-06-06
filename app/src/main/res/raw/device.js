@@ -215,9 +215,10 @@ function btListDevices() {
       if (adapter.available) {
         h += '<div class="bluetooth-scan-action">' + results_txt + ' scanning...</div>';
       }
-      var formatBtDev = function(dev) {
+      var formatBtDev = function(dev, i) {
         var h = '<div class="device-list-item';
         if (dev.address == window.selectedBtDev) h += '-selected';
+        h += (i & 1) ? ' device-list-item-odd' : ' device-list-item-even';
         h += ' bt-list-item"><span class="bluetooth-addr">' + dev.address
           + '</span>' + (dev.name || dev.address).abbreviate(16);  // abbreviate() in util.js.
         if (dev.paired) h += ' <span class="bluetooth-paired">(paired)</span>'
@@ -229,11 +230,14 @@ function btListDevices() {
       } else if (devlist.length == 0) {
         h += 'No bluetooth devices found.';
       } else {
+        j = 0;
         for (var i = 0; i < devlist.length; i++) if (devlist[i].paired) {
-          h += formatBtDev(devlist[i]) + '\n';
+          h += formatBtDev(devlist[i], j) + '\n';
+          j++;
         }
         for (var i = 0; i < devlist.length; i++) if (!devlist[i].paired) {
-          h += formatBtDev(devlist[i]) + '\n';
+          h += formatBtDev(devlist[i], j) + '\n';
+          j++;
         }
       }
       setHTMLofClass('device-list-bluetooth', h);
@@ -341,6 +345,16 @@ function selectTerm() {
 }
 
 function listDevices() {
+  var hh = '<div class="body-zoom">Zoom';
+  // Remember ChromeOS breaks onclick and disallows href="javascript:" so use <span> instead of <a>.
+  hh += ' <span class="body-zoom-in">[+]</span>';
+  hh += ' <span class="body-zoom-out">[&ndash;]</span>';
+  hh += '</div>';
+  setTimeout(function() {
+    setHandlerForClass('body-zoom-in', 'click', changeZoomIn);
+    setHandlerForClass('body-zoom-out', 'click', changeZoomOut);
+  }, 0);
+
   var h = '';
   var api = detectChromeApi();
   if (api && api.bluetooth && api.bluetoothSocket && api.storage) {
@@ -365,13 +379,15 @@ function listDevices() {
   }
   if (h == '') {
     h = 'No API support found. Please check manifest.json.';
-    setHTMLofClass('device-list', h);
+    setHTMLofClass('device-list', hh + h);
   } else if (getHTMLofClass('device-list') == '') {
+    h = 'Which device links to your car?' +
+      (api.system ? '<div class="system-settings-box"><a href="javascript:systemSettings();">' +
+      '[system]</a></div>' : '') +
+      h;
     // Populate <div class="device-list"> only the first time.
     // BUG: This will break if support for a class of devices changes during runtime.
-    setHTMLofClass('device-list', 'Which device links to your car?' +
-        '<div class="system-settings-box"><a href="javascript:systemSettings();">' +
-        '[system]</a></div>' + h);
+    setHTMLofClass('device-list', hh + h);
     if (api.system && api.storage && typeof(window.askForLocationPermission) == 'undefined') {
       api.storage.local.get({ 'haveLocationPermission': '' }, function(result) {
         if (typeof(api.runtime.lastError) != 'undefined') {
@@ -513,6 +529,41 @@ function setTabStyle() {
     }
     elist[i].className = base;
   }
+}
+
+function changeZoom(d) {
+  var el = document.getElementsByClassName('gobbed')
+  for (var i = 0; i < el.length; i++) {
+    if (el[i].tagName == 'BODY') {
+      var bodyEl = el[i];
+      window.theBody = bodyEl
+      var zoom
+      if (!bodyEl.style.zoom) {
+        // Note: must match zoom value in index.html stylesheet
+        zoom = 2
+        zoom += 1e-5  // Workaround chrome bug which resets zoom to 1 incorrectly
+      } else {
+        zoom = parseFloat(bodyEl.style.zoom)
+      }
+      zoom += d*0.2
+      if (zoom < 0.5) {
+        zoom = 0.5
+      }
+      bodyEl.style.zoom = zoom
+    }
+  }
+}
+
+function changeZoomIn(e) {
+  changeZoom(1);
+  e.stopPropagation();
+  return false;
+}
+
+function changeZoomOut(e) {
+  changeZoom(-1);
+  e.stopPropagation();
+  return false;
 }
 
 function initTabs() {

@@ -14,7 +14,16 @@ html, body {
 }
 body.gobbed {
     margin: 0px;
+    /* Note: must match value in device.js function changeZoom() */
     zoom: 2;
+}
+.body-zoom {
+    padding-bottom: 1em;
+}
+.body-zoom .body-zoom-in, .body-zoom .body-zoom-out {
+    color: #2090f0;
+    text-decoration: underline;
+    cursor: pointer;
 }
 .gobbed-table {
     display:table;
@@ -74,14 +83,27 @@ body.gobbed {
     font-weight: bold;
 }
 .device-list-item {
-    padding-left: 20px;
+    padding-left: 4px;
+    border-radius: 4px;
+    margin: 0 4px 0 16px;
+}
+.device-list-item-even {
+    background: #909090;
+}
+.device-list-item-odd {
+    background: #a8a8a8;
 }
 .device-list-item:hover {
     background: #ffffe0;
 }
 .device-list-item-selected {
-    padding-left: 20px;
+    padding-left: 4px;
+    border-radius: 4px;
+    margin: 0 4px 0 16px;
     background: #f0f060;
+}
+.device-list-item-selected-odd {
+    border: solid #000 1px;
 }
 .device-list-item-disabled {
     padding-left: 20px;
@@ -90,6 +112,7 @@ body.gobbed {
     padding-left: 20px;
     color: #2090f0;
     text-decoration: underline;
+    cursor: pointer;
 }
 .bluetooth-addr {
     display:none;

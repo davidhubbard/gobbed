@@ -31,9 +31,12 @@ function setHandlerForClass(c, evname, cb) {
   for (var i = 0; i < elist.length; i++) {
     elist[i].addEventListener(evname, function(e_target) {
       return function(e) {
-        cb({
+        return cb({
           'keyCode': e.keyCode,
           'target': e_target,
+          'stopPropagation': function() {
+            e.stopPropagation();
+          },
         });
       }
     }(elist[i]));
